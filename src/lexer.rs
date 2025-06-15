@@ -1,6 +1,6 @@
 use std::str::Chars;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Token {
     Eof,
     Def,
@@ -42,49 +42,45 @@ impl Lexer {
             self.last_char = chars.next();
         }
 
-        if self.last_char == None {
+        if self.last_char.is_none() {
             return Token::Eof;
         }
 
         if self.last_char.unwrap().is_ascii_alphabetic() {
-            return self.get_identifier(chars);
+            self.get_identifier(chars)
         } else if self.last_char.unwrap().is_numeric() {
-            return self.get_number(chars);
-        } else {
-            if self.last_char.unwrap() == IDENT_CHAR_COMMENT {
-                // Comment until end of line
-                loop {
-                    self.last_char = chars.next();
-                    if self.last_char == None
-                        || self.last_char.unwrap() == '\n'
-                        || self.last_char.unwrap() == '\r'
-                    {
-                        break;
-                    }
-                }
-                return self.get_token(chars);
-            } else {
-                self.identifier_str.push(self.last_char.unwrap());
+            self.get_number(chars)
+        } else if self.last_char.unwrap() == IDENT_CHAR_COMMENT {
+            loop {
                 self.last_char = chars.next();
-                return Token::Character;
+                if self.last_char.is_none()
+                    || self.last_char.unwrap() == '\n'
+                    || self.last_char.unwrap() == '\r'
+                {
+                    break;
+                }
             }
+            self.get_token(chars)
+        } else {
+            self.identifier_str.push(self.last_char.unwrap());
+            self.last_char = chars.next();
+            Token::Character
         }
     }
+
     fn get_identifier(&mut self, chars: &mut Chars) -> Token {
         loop {
             self.identifier_str.push(self.last_char.unwrap());
             self.last_char = chars.next();
-            if self.last_char == None || !self.last_char.unwrap().is_ascii_alphanumeric() {
+            if self.last_char.is_none() || !self.last_char.unwrap().is_ascii_alphanumeric() {
                 break;
             }
         }
-        if self.identifier_str == IDENT_DEF {
-            return Token::Def;
+        match self.identifier_str.as_str() {
+            IDENT_DEF => Token::Def,
+            IDENT_EXTERN => Token::Extern,
+            _ => Token::Identifier,
         }
-        if self.identifier_str == IDENT_EXTERN {
-            return Token::Extern;
-        }
-        Token::Identifier
     }
 
     fn get_number(&mut self, chars: &mut Chars) -> Token {
@@ -92,10 +88,10 @@ impl Lexer {
         loop {
             num_str.push(self.last_char.unwrap());
             self.last_char = chars.next();
-            if self.last_char == None || !self.last_char.unwrap().is_numeric() {
-                if self.last_char.unwrap() != '.' {
-                    break;
-                }
+            if self.last_char.is_none()
+                || (!self.last_char.unwrap().is_numeric() && self.last_char.unwrap() != '.')
+            {
+                break;
             }
         }
         self.num_val = match num_str.parse::<f64>() {

@@ -15,9 +15,8 @@ fn main() {
         let id = &lexer.identifier_str;
         let num = lexer.num_val;
         println!("{id:?} {num:?} {tok:?}");
-        match tok {
-            Token::Eof => break,
-            _ => {}
+        if tok == Token::Eof {
+            break;
         }
     }
 }
