@@ -101,3 +101,37 @@ impl Lexer {
         Token::Number
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_token() {
+        let input = String::from("a ä+b 0.3 0.33#abc\ndef");
+        let mut chars = input.chars();
+        let mut lexer = Lexer::new();
+        assert_eq!(lexer.get_token(&mut chars), Token::Identifier);
+        assert_eq!(lexer.identifier_str, "a");
+
+        assert_eq!(lexer.get_token(&mut chars), Token::Character);
+        assert_eq!(lexer.identifier_str, "ä");
+
+        assert_eq!(lexer.get_token(&mut chars), Token::Character);
+        assert_eq!(lexer.identifier_str, "+");
+
+        assert_eq!(lexer.get_token(&mut chars), Token::Identifier);
+        assert_eq!(lexer.identifier_str, "b");
+
+        assert_eq!(lexer.get_token(&mut chars), Token::Number);
+        assert_eq!(lexer.num_val, 0.3);
+
+        assert_eq!(lexer.get_token(&mut chars), Token::Number);
+        assert_eq!(lexer.num_val, 0.33);
+
+        assert_eq!(lexer.get_token(&mut chars), Token::Def);
+        assert_eq!(lexer.identifier_str, "def");
+
+        assert_eq!(lexer.get_token(&mut chars), Token::Eof);
+    }
+}
