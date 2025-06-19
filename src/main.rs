@@ -2,7 +2,6 @@ mod ast;
 mod lexer;
 mod parser;
 use crate::lexer::Lexer;
-use crate::lexer::Token;
 use crate::parser::Parser;
 use std::io::prelude::*;
 
@@ -17,14 +16,5 @@ fn main() {
 
     let mut lexer = Lexer::new(chars);
     let mut parser = Parser::new(&mut lexer);
-    loop {
-        parser.main_loop();
-        // let tok = lexer.get_token();
-        // let id = &lexer.identifier_str;
-        // let num = lexer.num_val;
-        // println!("{id:?} {num:?} {tok:?}");
-        // if tok == Token::Eof {
-        //     break;
-        // }
-    }
+    parser.main_loop();
 }

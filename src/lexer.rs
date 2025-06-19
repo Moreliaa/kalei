@@ -30,9 +30,7 @@ impl<'a> Lexer<'a> {
             chars,
         }
     }
-    /**
-     * Return the next token from standard input.
-     */
+
     pub fn get_token(&mut self) -> Token {
         self.identifier_str = String::new();
         self.num_val = 0.0;

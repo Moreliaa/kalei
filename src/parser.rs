@@ -1,5 +1,4 @@
 use crate::{ast::*, lexer::*};
-use std::str::Chars;
 
 pub struct Parser<'a> {
     lexer: &'a mut Lexer<'a>,
@@ -45,21 +44,21 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_binary_op_rhs(&mut self, expr_precedence: u8, lhs: Box<dyn Expr>) -> Box<dyn Expr> {
+    fn parse_binary_op_rhs(&mut self, expr_precedence: i8, lhs: Box<dyn Expr>) -> Box<dyn Expr> {
         let mut lhs = lhs;
         loop {
-            let tok_precedence: u8 = 0; // TODO get from table for current token
+            let tok_precedence: i8 = self.get_op_precedence();
             if tok_precedence < expr_precedence {
                 return lhs;
             }
 
             // found a bin op
-            let bin_op_char = self.lexer.last_char.unwrap();
+            let bin_op_char = self.lexer.identifier_str.clone();
             self.read_token();
 
             let mut rhs = self.parse_primary();
 
-            let next_precedence: u8 = 0; // TODO
+            let next_precedence: i8 = self.get_op_precedence();
             if tok_precedence < next_precedence {
                 // TODO what happens for large expressions with tok_precedence + 1?
                 rhs = self.parse_binary_op_rhs(tok_precedence + 1, rhs);
@@ -70,7 +69,7 @@ impl<'a> Parser<'a> {
 
     fn parse_expr(&mut self) -> Box<dyn Expr> {
         let lhs: Box<dyn Expr> = self.parse_primary();
-        return self.parse_binary_op_rhs(0, lhs);
+        self.parse_binary_op_rhs(0, lhs)
     }
 
     fn parse_top_level_expr(&mut self) -> Box<dyn Expr> {
@@ -84,14 +83,35 @@ impl<'a> Parser<'a> {
 
     fn read_token(&mut self) {
         self.cur_token = Some(self.lexer.get_token());
-        self.log_verbose(format!("Read a token {:?}", self.cur_token));
+        self.log_verbose(format!(
+            "Read a token {:?} {:?}",
+            if self.lexer.identifier_str != "" {
+                self.lexer.identifier_str.to_string()
+            } else {
+                self.lexer.num_val.to_string()
+            },
+            self.cur_token,
+        ));
+    }
+
+    fn get_op_precedence(&self) -> i8 {
+        if self.cur_token != Some(Token::Character) {
+            return -1;
+        }
+        match self.lexer.identifier_str.as_str() {
+            "+" => 10,
+            "-" => 20,
+            "*" => 10,
+            "/" => 20,
+            _ => todo!("{}", self.lexer.identifier_str),
+        }
     }
 
     pub fn main_loop(&mut self) {
         self.read_token();
         loop {
             if let Some(tok) = &self.cur_token {
-                let result = match tok {
+                match tok {
                     Token::Eof => break,
                     Token::Number | Token::Character => self.parse_top_level_expr(),
                     _ => todo!(),
