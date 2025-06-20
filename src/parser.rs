@@ -15,56 +15,106 @@ impl<'a> Parser<'a> {
         }
     }
 
+    // numberexpr ::= number
     fn parse_number_expr(&mut self) -> NumberExprAst {
         let result = NumberExprAst::new(self.lexer.num_val);
         self.read_token();
         result
     }
 
+    // parenthesisexpr ::= '(' expr ')'
+    fn parse_parenthesis_expr(&mut self) -> Box<dyn Expr> {
+        self.read_token(); // eat (
+        let result = self.parse_expr();
+        if self.lexer.identifier_str != ")" {
+            panic!("Expected ')'");
+        }
+        self.read_token(); // eat )
+        result
+    }
+
+    // variable references and function calls
+    // identifierexpr ::= identifier
+    // identifierexpr ::= identifier '(' expr* ')'
+    fn parse_identifier_expr(&mut self) -> Box<dyn Expr> {
+        let identifier = self.lexer.identifier_str.clone();
+        self.read_token(); // eat identifier
+        if self.lexer.identifier_str != "(" {
+            return Box::new(VariableExprAst::new(identifier));
+        }
+
+        // function call
+        self.read_token(); // eat (
+
+        let mut args: Vec<Box<dyn Expr>> = vec![];
+        if self.lexer.identifier_str != ")" {
+            loop {
+                let arg = self.parse_expr();
+                args.push(arg);
+
+                if self.lexer.identifier_str == ")" {
+                    break;
+                }
+
+                if self.lexer.identifier_str != "," {
+                    panic!("Expected ','");
+                }
+
+                self.read_token();
+            }
+        }
+
+        self.read_token(); // eat )
+        Box::new(FunctionCallExprAst::new(identifier, args))
+    }
+
+    // primary ::= numberexpr
+    // primary ::= identifierexpr
+    // primary ::= parenthesisexpr
     fn parse_primary(&mut self) -> Box<dyn Expr> {
         if let Some(tok) = &self.cur_token {
             match tok {
                 Token::Number => Box::new(self.parse_number_expr()),
-                // Token::Character => {
-                //     if let Some(c) = &self.lexer.last_char {
-                //         match c {
-                //             '+' | '-' | '*' | '/' => Box::new(self.parse_binary_expr()),
-                //             _ => todo!(),
-                //         }
-                //     } else {
-                //         panic!("Expected character");
-                //     }
-                // }
-                _ => todo!(),
+                Token::Identifier => self.parse_identifier_expr(),
+                Token::Character => {
+                    if self.lexer.identifier_str == "(" {
+                        self.parse_parenthesis_expr()
+                    } else {
+                        panic!("Unknown token '{}'", self.lexer.identifier_str);
+                    }
+                }
+                _ => panic!("Unexpected token {:?}", tok),
             }
         } else {
             panic!("Expected token");
         }
     }
 
+    // binoprhs ::= (('+'|'-'|'*'|'/') primary)*
     fn parse_binary_op_rhs(&mut self, expr_precedence: i8, lhs: Box<dyn Expr>) -> Box<dyn Expr> {
+        // TODO left-right associativity
         let mut lhs = lhs;
         loop {
             let tok_precedence: i8 = self.get_op_precedence();
-            if tok_precedence < expr_precedence {
+            if tok_precedence <= expr_precedence {
                 return lhs;
             }
 
-            // found a bin op
+            // found bin op
             let bin_op_char = self.lexer.identifier_str.clone();
-            self.read_token();
+            self.read_token(); // eat operator
 
             let mut rhs = self.parse_primary();
 
             let next_precedence: i8 = self.get_op_precedence();
             if tok_precedence < next_precedence {
-                // TODO what happens for large expressions with tok_precedence + 1?
-                rhs = self.parse_binary_op_rhs(tok_precedence + 1, rhs);
+                rhs = self.parse_binary_op_rhs(tok_precedence, rhs);
             }
             lhs = Box::new(BinaryExprAst::new(bin_op_char, lhs, rhs));
         }
     }
 
+    // expr ::= primary binoprhs
     fn parse_expr(&mut self) -> Box<dyn Expr> {
         let lhs: Box<dyn Expr> = self.parse_primary();
         self.parse_binary_op_rhs(0, lhs)
@@ -103,7 +153,7 @@ impl<'a> Parser<'a> {
             "-" => 10,
             "*" => 20,
             "/" => 20,
-            _ => todo!("{}", self.lexer.identifier_str),
+            _ => -1,
         }
     }
 
