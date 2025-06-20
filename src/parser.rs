@@ -154,11 +154,17 @@ impl<'a> Parser<'a> {
         let mut args: Vec<String> = vec![];
         while self.cur_token == Some(Token::Identifier) {
             args.push(self.lexer.identifier_str.clone());
-            self.read_token();
+            self.read_token(); // eat identifier
+            if self.lexer.identifier_str == "," {
+                self.read_token(); // eat ,
+            }
         }
 
         if self.lexer.identifier_str != ")" {
-            panic!("Expected ')' in prototype");
+            panic!(
+                "Expected ')' in prototype, found {}",
+                self.lexer.identifier_str
+            );
         }
 
         self.read_token(); // eat )
@@ -170,7 +176,7 @@ impl<'a> Parser<'a> {
         self.read_token(); // eat def
         let proto = self.parse_prototype();
         let body = self.parse_expr();
-        self.log_verbose(String::from("Parsed function definition"));
+        self.log_verbose(format!("Parsed function definition {}", proto.name));
         FunctionAst::new(proto, body)
     }
 

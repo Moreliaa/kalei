@@ -51,8 +51,8 @@ impl Expr for VariableExprAst {
 }
 
 pub struct FunctionCallExprAst {
-    callee: String,
-    args: Vec<Box<dyn Expr>>,
+    pub callee: String,
+    pub args: Vec<Box<dyn Expr>>,
 }
 impl FunctionCallExprAst {
     pub fn new(callee: String, args: Vec<Box<dyn Expr>>) -> FunctionCallExprAst {
@@ -69,8 +69,8 @@ impl Expr for FunctionCallExprAst {
 pub trait Function {}
 
 pub struct PrototypeAst {
-    name: String,
-    args: Vec<String>,
+    pub name: String,
+    pub args: Vec<String>,
 }
 impl PrototypeAst {
     pub fn new(name: String, args: Vec<String>) -> PrototypeAst {
@@ -80,8 +80,8 @@ impl PrototypeAst {
 impl Function for PrototypeAst {}
 
 pub struct FunctionAst {
-    proto: PrototypeAst,
-    body: Box<dyn Expr>,
+    pub proto: PrototypeAst,
+    pub body: Box<dyn Expr>,
 }
 impl FunctionAst {
     pub fn new(proto: PrototypeAst, body: Box<dyn Expr>) -> FunctionAst {
