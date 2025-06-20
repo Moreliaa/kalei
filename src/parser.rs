@@ -75,16 +75,11 @@ impl<'a> Parser<'a> {
     // primary ::= numberexpr
     // primary ::= identifierexpr
     // primary ::= parenthesisexpr
-    fn parse_primary(&mut self) -> Option<Box<dyn Expr>> {
+    fn parse_primary(&mut self) -> Box<dyn Expr> {
         if let Some(tok) = &self.cur_token {
             match tok {
-                Token::Number => Some(Box::new(self.parse_number_expr())),
-                Token::Identifier => Some(self.parse_identifier_expr()),
-                Token::Character => match self.lexer.identifier_str.as_str() {
-                    "(" => Some(self.parse_parenthesis_expr()),
-                    ";" => None,
-                    _ => panic!("Unknown token '{}'", self.lexer.identifier_str),
-                },
+                Token::Number => Box::new(self.parse_number_expr()),
+                Token::Identifier => self.parse_identifier_expr(),
                 _ => panic!("Unexpected token {:?}", tok),
             }
         } else {
@@ -93,18 +88,14 @@ impl<'a> Parser<'a> {
     }
 
     // binoprhs ::= (('+'|'-'|'*'|'/') primary)*
-    fn parse_binary_op_rhs(
-        &mut self,
-        expr_precedence: i8,
-        lhs: Box<dyn Expr>,
-    ) -> Option<Box<dyn Expr>> {
+    fn parse_binary_op_rhs(&mut self, expr_precedence: i8, lhs: Box<dyn Expr>) -> Box<dyn Expr> {
         // TODO left-right associativity
         let mut lhs = lhs;
         loop {
             let tok_precedence: i8 = self.get_op_precedence();
             if tok_precedence <= expr_precedence {
                 self.log_verbose(String::from("Parsed binary expression"));
-                return Some(lhs);
+                return lhs;
             }
 
             // found bin op
@@ -112,29 +103,19 @@ impl<'a> Parser<'a> {
             self.read_token(); // eat operator
 
             let mut rhs = self.parse_primary();
-            if rhs.is_none() {
-                return None;
-            }
 
             let next_precedence: i8 = self.get_op_precedence();
             if tok_precedence < next_precedence {
-                rhs = self.parse_binary_op_rhs(tok_precedence, rhs.unwrap());
-                if rhs.is_none() {
-                    return None;
-                }
+                rhs = self.parse_binary_op_rhs(tok_precedence, rhs);
             }
-            lhs = Box::new(BinaryExprAst::new(bin_op_char, lhs, rhs.unwrap()));
+            lhs = Box::new(BinaryExprAst::new(bin_op_char, lhs, rhs));
         }
     }
 
     // expr ::= primary binoprhs
     fn parse_expr(&mut self) -> Box<dyn Expr> {
-        if let Some(lhs) = self.parse_primary() {
-            if let Some(result) = self.parse_binary_op_rhs(0, lhs) {
-                return result;
-            }
-        }
-        panic!("Expected expression");
+        let lhs = self.parse_primary();
+        self.parse_binary_op_rhs(0, lhs)
     }
 
     // prototype ::= identifier '(' identifier* ')'
