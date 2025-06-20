@@ -1,6 +1,7 @@
 mod ast;
 mod lexer;
 mod parser;
+mod treeprinter;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use std::io::prelude::*;

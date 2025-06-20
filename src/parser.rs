@@ -1,4 +1,6 @@
-use crate::{ast::*, lexer::*};
+use crate::{ast::*, lexer::*, treeprinter::*};
+
+const USE_VERBOSE_LOGS: bool = false;
 
 pub struct Parser<'a> {
     lexer: &'a mut Lexer<'a>,
@@ -17,10 +19,6 @@ impl<'a> Parser<'a> {
         let result = NumberExprAst::new(self.lexer.num_val);
         self.read_token();
         result
-    }
-
-    fn parse_binary_expr(&mut self) -> BinaryExprAst {
-        todo!()
     }
 
     fn parse_primary(&mut self) -> Box<dyn Expr> {
@@ -78,7 +76,9 @@ impl<'a> Parser<'a> {
     }
 
     fn log_verbose(&self, msg: String) {
-        println!("{}", msg);
+        if USE_VERBOSE_LOGS {
+            println!("{}", msg);
+        }
     }
 
     fn read_token(&mut self) {
@@ -100,8 +100,8 @@ impl<'a> Parser<'a> {
         }
         match self.lexer.identifier_str.as_str() {
             "+" => 10,
-            "-" => 20,
-            "*" => 10,
+            "-" => 10,
+            "*" => 20,
             "/" => 20,
             _ => todo!("{}", self.lexer.identifier_str),
         }
@@ -111,11 +111,15 @@ impl<'a> Parser<'a> {
         self.read_token();
         loop {
             if let Some(tok) = &self.cur_token {
-                match tok {
+                let expr: Box<dyn Expr> = match tok {
                     Token::Eof => break,
                     Token::Number | Token::Character => self.parse_top_level_expr(),
                     _ => todo!(),
                 };
+
+                let mut treeprinter = TreePrinter::new();
+                expr.print(&mut treeprinter, 0, 0);
+                treeprinter.print_tree();
             }
         }
     }
