@@ -31,17 +31,8 @@ impl BinaryExprAst {
 impl Expr for BinaryExprAst {
     fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32) {
         treeprinter.add_print_item(self.op.clone(), depth, indent_lvl);
-
-        let indent_lvl_lhs = match &self.lhs {
-            BinaryExprAst => indent_lvl - 2,
-            _ => indent_lvl - 1,
-        };
-        let indent_lvl_rhs = match &self.rhs {
-            BinaryExprAst => indent_lvl + 2,
-            _ => indent_lvl + 1,
-        };
-        self.lhs.print(treeprinter, indent_lvl_lhs, depth + 1);
-        self.rhs.print(treeprinter, indent_lvl_rhs, depth + 1);
+        self.lhs.print(treeprinter, indent_lvl - 1, depth + 1);
+        self.rhs.print(treeprinter, indent_lvl + 1, depth + 1);
     }
 }
 
@@ -75,6 +66,8 @@ impl Expr for FunctionCallExprAst {
     }
 }
 
+pub trait Function {}
+
 pub struct PrototypeAst {
     name: String,
     args: Vec<String>,
@@ -84,6 +77,7 @@ impl PrototypeAst {
         PrototypeAst { name, args }
     }
 }
+impl Function for PrototypeAst {}
 
 pub struct FunctionAst {
     proto: PrototypeAst,
@@ -94,3 +88,4 @@ impl FunctionAst {
         FunctionAst { proto, body }
     }
 }
+impl Function for FunctionAst {}
