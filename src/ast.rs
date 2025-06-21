@@ -4,6 +4,7 @@ use crate::codegen::CodeGenContext;
 use llvm::core::*;
 use llvm::prelude::LLVMValueRef;
 use llvm_sys::analysis::LLVMVerifyFunction;
+use llvm_sys::execution_engine::LLVMGetFunctionAddress;
 
 pub trait Expr {
     fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32);
@@ -25,8 +26,8 @@ impl Expr for NumberExprAst {
 
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
-            let ft = llvm::core::LLVMFloatTypeInContext(codegen_context.context);
-            llvm::core::LLVMConstReal(ft, self.val)
+            let ft = LLVMDoubleTypeInContext(codegen_context.context);
+            LLVMConstReal(ft, self.val)
         }
     }
 }
@@ -104,7 +105,8 @@ impl Expr for FunctionCallExprAst {
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
             // convert rust *const u8 pointer to C-compatible *const i8 pointer
-            let ptr = self.callee.as_ptr() as *const i8;
+            let name = (self.callee.clone() + "\0").into_bytes();
+            let ptr = name.as_ptr() as *const i8;
             let callee_nf = LLVMGetNamedFunction(codegen_context.module, ptr);
             let callee_t = LLVMGlobalGetValueType(callee_nf);
             let mut args_v: Vec<LLVMValueRef> = self
@@ -153,8 +155,8 @@ impl Function for PrototypeAst {
                 args_t.len() as u32,
                 false as i32, // TODO what is this?
             );
-            // let ptr = self.name.as_ptr() as *const i8;
-            let ptr = c"Test".as_ptr();
+            let name = (self.name.clone() + "\0").into_bytes();
+            let ptr = name.as_ptr() as *const i8;
 
             // TODO setting arg names
             println!("create prototype function");

@@ -80,6 +80,10 @@ impl<'a> Parser<'a> {
             match tok {
                 Token::Number => Box::new(self.parse_number_expr()),
                 Token::Identifier => self.parse_identifier_expr(),
+                Token::Character => match self.lexer.identifier_str.as_str() {
+                    "(" => self.parse_parenthesis_expr(),
+                    _ => panic!("Unexpected character {:?}", self.lexer.identifier_str),
+                },
                 _ => panic!("Unexpected token {:?}", tok),
             }
         } else {
@@ -210,6 +214,7 @@ impl<'a> Parser<'a> {
 
     pub fn main_loop(&mut self) {
         self.read_token();
+        let mut codegen_context = create_context();
         loop {
             if let Some(tok) = &self.cur_token {
                 let function: Box<dyn Function> = match tok {
@@ -226,15 +231,17 @@ impl<'a> Parser<'a> {
                     _ => Box::new(self.parse_top_level_expr()),
                 };
 
-                generate_code(function);
+                generate_code(&mut codegen_context, function);
 
                 // TODO treeprinter
                 // let mut treeprinter = TreePrinter::new();
                 // function.body.expr.print(&mut treeprinter, 0, 0);
                 // treeprinter.print_tree();
             } else {
+                dispose_context(&mut codegen_context);
                 panic!("Expected token");
             }
         }
+        dispose_context(&mut codegen_context);
     }
 }
