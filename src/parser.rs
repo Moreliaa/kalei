@@ -186,7 +186,7 @@ impl<'a> Parser<'a> {
         self.cur_token = Some(self.lexer.get_token());
         self.log_verbose(format!(
             "Read a token {:?} {:?}",
-            if self.lexer.identifier_str != "" {
+            if !self.lexer.identifier_str.is_empty() {
                 self.lexer.identifier_str.to_string()
             } else {
                 self.lexer.num_val.to_string()
