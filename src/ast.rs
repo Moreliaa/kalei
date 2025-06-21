@@ -7,7 +7,7 @@ use llvm_sys::analysis::LLVMVerifyFunction;
 
 pub trait Expr {
     fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32);
-    fn generate_code(&self, codegen_context: &CodeGenContext) -> LLVMValueRef;
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef;
 }
 
 pub struct NumberExprAst {
@@ -23,7 +23,7 @@ impl Expr for NumberExprAst {
         treeprinter.add_print_item(self.val.to_string(), depth, indent_lvl);
     }
 
-    fn generate_code(&self, codegen_context: &CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
             let ft = llvm::core::LLVMFloatTypeInContext(codegen_context.context);
             llvm::core::LLVMConstReal(ft, self.val)
@@ -48,7 +48,7 @@ impl Expr for BinaryExprAst {
         self.rhs.print(treeprinter, indent_lvl + 1, depth + 1);
     }
 
-    fn generate_code(&self, codegen_context: &CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
             let lhs_value = self.lhs.generate_code(codegen_context);
             let rhs_value = self.rhs.generate_code(codegen_context);
@@ -77,7 +77,7 @@ impl Expr for VariableExprAst {
         treeprinter.add_print_item(self.name.clone(), depth, indent_lvl);
     }
 
-    fn generate_code(&self, codegen_context: &CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         if codegen_context.named_values.contains_key(&self.name) {
             *codegen_context.named_values.get(&self.name).unwrap()
         } else {
@@ -101,7 +101,7 @@ impl Expr for FunctionCallExprAst {
         treeprinter.add_print_item(self.callee.clone(), depth, indent_lvl);
     }
 
-    fn generate_code(&self, codegen_context: &CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
             // convert rust *const u8 pointer to C-compatible *const i8 pointer
             let ptr = self.callee.as_ptr() as *const i8;
@@ -126,7 +126,7 @@ impl Expr for FunctionCallExprAst {
 }
 
 pub trait Function {
-    fn generate_code(&self, codegen_context: &CodeGenContext) -> LLVMValueRef;
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef;
 }
 
 pub struct PrototypeAst {
@@ -139,7 +139,7 @@ impl PrototypeAst {
     }
 }
 impl Function for PrototypeAst {
-    fn generate_code(&self, codegen_context: &CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
             let dt = LLVMDoubleTypeInContext(codegen_context.context);
             let mut args_t: Vec<llvm::prelude::LLVMTypeRef> =
@@ -168,18 +168,25 @@ impl FunctionAst {
     }
 }
 impl Function for FunctionAst {
-    fn generate_code(&self, codegen_context: &CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
             let function = self.proto.generate_code(codegen_context); // TODO handle repeated calls
             let ptr = self.proto.name.as_ptr() as *const i8;
             let bb =
                 LLVMAppendBasicBlockInContext(codegen_context.context, function, c"entry".as_ptr());
+
             // insert instructions into the end of the basic block
             LLVMPositionBuilderAtEnd(codegen_context.ir_builder, bb);
+
+            codegen_context.named_values.clear();
             for i in 0..self.proto.args.len() {
                 let param = LLVMGetParam(function, i as u32);
-                // TODO put named params into named values map
+                match self.proto.args.get(i) {
+                    Some(name) => codegen_context.named_values.insert(name.clone(), param),
+                    None => panic!("Invalid function param"),
+                };
             }
+
             let return_value = self.body.generate_code(codegen_context);
             LLVMBuildRet(codegen_context.ir_builder, return_value);
             LLVMVerifyFunction(
