@@ -1,4 +1,4 @@
-use crate::{ast::*, lexer::*, treeprinter::*};
+use crate::{ast::*, codegen::*, lexer::*, treeprinter::*};
 
 const USE_VERBOSE_LOGS: bool = true;
 
@@ -225,6 +225,8 @@ impl<'a> Parser<'a> {
                     },
                     _ => Box::new(self.parse_top_level_expr()),
                 };
+
+                generate_code(function);
 
                 // TODO treeprinter
                 // let mut treeprinter = TreePrinter::new();

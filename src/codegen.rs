@@ -5,6 +5,10 @@ use std::collections::HashMap;
 use llvm::prelude::LLVMBuilderRef;
 use llvm::prelude::LLVMContextRef;
 use llvm::prelude::LLVMValueRef;
+use llvm_sys::core::LLVMContextDispose;
+use llvm_sys::core::LLVMDisposeBuilder;
+use llvm_sys::core::LLVMDisposeModule;
+use llvm_sys::core::LLVMDumpModule;
 use llvm_sys::prelude::LLVMModuleRef;
 
 // use llvm::core::*;
@@ -19,23 +23,26 @@ pub struct CodeGenContext {
     pub named_values: HashMap<String, LLVMValueRef>,
 }
 
-pub fn generate_code(some_expr: Box<dyn Expr>) {
+pub fn generate_code(function: Box<dyn Function>) {
     unsafe {
         let context: LLVMContextRef = llvm::core::LLVMContextCreate();
-        let module_id = b"sum\0".as_ptr() as *const _;
+        let module_id = c"sum".as_ptr();
         let module = llvm::core::LLVMModuleCreateWithNameInContext(module_id, context);
         let ir_builder = llvm::core::LLVMCreateBuilderInContext(context);
 
         // symbol table
-        let mut named_values: HashMap<String, LLVMValueRef> = HashMap::new();
 
         let mut codegen_context = CodeGenContext {
             context,
             module,
             ir_builder,
-            named_values,
+            named_values: HashMap::new(),
         };
 
-        let value: LLVMValueRef = some_expr.generate_code(&codegen_context);
+        function.generate_code(&codegen_context);
+        LLVMDumpModule(codegen_context.module); // dump module as IR to stdout
+        LLVMDisposeBuilder(codegen_context.ir_builder);
+        LLVMDisposeModule(codegen_context.module);
+        LLVMContextDispose(codegen_context.context);
     }
 }

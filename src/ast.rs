@@ -3,6 +3,7 @@ extern crate llvm_sys as llvm;
 use crate::codegen::CodeGenContext;
 use llvm::core::*;
 use llvm::prelude::LLVMValueRef;
+use llvm_sys::analysis::LLVMVerifyFunction;
 
 pub trait Expr {
     fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32);
@@ -106,10 +107,12 @@ impl Expr for FunctionCallExprAst {
             let ptr = self.callee.as_ptr() as *const i8;
             let callee_nf = LLVMGetNamedFunction(codegen_context.module, ptr);
             let callee_t = LLVMGlobalGetValueType(callee_nf);
-            let mut args_v: Vec<LLVMValueRef> = vec![];
-            for i in 0..self.args.len() {
-                args_v.push(self.args.get(i).unwrap().generate_code(codegen_context));
-            }
+            let mut args_v: Vec<LLVMValueRef> = self
+                .args
+                .iter()
+                .map(|expr| expr.generate_code(codegen_context))
+                .collect();
+
             LLVMBuildCall2(
                 codegen_context.ir_builder,
                 callee_t,
@@ -122,7 +125,9 @@ impl Expr for FunctionCallExprAst {
     }
 }
 
-pub trait Function {}
+pub trait Function {
+    fn generate_code(&self, codegen_context: &CodeGenContext) -> LLVMValueRef;
+}
 
 pub struct PrototypeAst {
     pub name: String,
@@ -133,7 +138,25 @@ impl PrototypeAst {
         PrototypeAst { name, args }
     }
 }
-impl Function for PrototypeAst {}
+impl Function for PrototypeAst {
+    fn generate_code(&self, codegen_context: &CodeGenContext) -> LLVMValueRef {
+        unsafe {
+            let dt = LLVMDoubleTypeInContext(codegen_context.context);
+            let mut args_t: Vec<llvm::prelude::LLVMTypeRef> =
+                self.args.iter().map(|_| dt).collect();
+            let ft = LLVMFunctionType(
+                dt,                  // return type
+                args_t.as_mut_ptr(), // argument types
+                args_t.len() as u32,
+                false as i32, // TODO what is this?
+            );
+            let ptr = self.name.as_ptr() as *const i8;
+
+            // TODO setting arg names
+            LLVMAddFunction(codegen_context.module, ptr, ft)
+        }
+    }
+}
 
 pub struct FunctionAst {
     pub proto: PrototypeAst,
@@ -144,4 +167,29 @@ impl FunctionAst {
         FunctionAst { proto, body }
     }
 }
-impl Function for FunctionAst {}
+impl Function for FunctionAst {
+    fn generate_code(&self, codegen_context: &CodeGenContext) -> LLVMValueRef {
+        unsafe {
+            let function = self.proto.generate_code(codegen_context); // TODO handle repeated calls
+            let ptr = self.proto.name.as_ptr() as *const i8;
+            let bb =
+                LLVMAppendBasicBlockInContext(codegen_context.context, function, c"entry".as_ptr());
+            // insert instructions into the end of the basic block
+            LLVMPositionBuilderAtEnd(codegen_context.ir_builder, bb);
+            for i in 0..self.proto.args.len() {
+                let param = LLVMGetParam(function, i as u32);
+                // TODO put named params into named values map
+            }
+            let return_value = self.body.generate_code(codegen_context);
+            LLVMBuildRet(codegen_context.ir_builder, return_value);
+            LLVMVerifyFunction(
+                function,
+                llvm_sys::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction,
+            );
+            // TODO delete invalid functions
+            // TODO fix extern function precedence over local
+
+            function
+        }
+    }
+}
