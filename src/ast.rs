@@ -141,18 +141,23 @@ impl PrototypeAst {
 impl Function for PrototypeAst {
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
+            println!("===prototype===");
+            println!("llvm double type");
             let dt = LLVMDoubleTypeInContext(codegen_context.context);
             let mut args_t: Vec<llvm::prelude::LLVMTypeRef> =
                 self.args.iter().map(|_| dt).collect();
+            println!("llvm function type");
             let ft = LLVMFunctionType(
                 dt,                  // return type
                 args_t.as_mut_ptr(), // argument types
                 args_t.len() as u32,
                 false as i32, // TODO what is this?
             );
-            let ptr = self.name.as_ptr() as *const i8;
+            // let ptr = self.name.as_ptr() as *const i8;
+            let ptr = c"Test".as_ptr();
 
             // TODO setting arg names
+            println!("create prototype function");
             LLVMAddFunction(codegen_context.module, ptr, ft)
         }
     }
@@ -170,8 +175,10 @@ impl FunctionAst {
 impl Function for FunctionAst {
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
+            println!("create prototype");
             let function = self.proto.generate_code(codegen_context); // TODO handle repeated calls
             let ptr = self.proto.name.as_ptr() as *const i8;
+            println!("create block");
             let bb =
                 LLVMAppendBasicBlockInContext(codegen_context.context, function, c"entry".as_ptr());
 
@@ -187,8 +194,11 @@ impl Function for FunctionAst {
                 };
             }
 
+            println!("create function body");
             let return_value = self.body.generate_code(codegen_context);
+            println!("create return value");
             LLVMBuildRet(codegen_context.ir_builder, return_value);
+            println!("verify function");
             LLVMVerifyFunction(
                 function,
                 llvm_sys::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction,

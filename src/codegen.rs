@@ -25,6 +25,7 @@ pub struct CodeGenContext {
 
 pub fn generate_code(function: Box<dyn Function>) {
     unsafe {
+        println!("Create code gen context");
         let context: LLVMContextRef = llvm::core::LLVMContextCreate();
         let module_id = c"module".as_ptr();
         let module = llvm::core::LLVMModuleCreateWithNameInContext(module_id, context);
@@ -39,7 +40,9 @@ pub fn generate_code(function: Box<dyn Function>) {
             named_values: HashMap::new(),
         };
 
+        println!("Gen code");
         function.generate_code(&mut codegen_context);
+        println!("Code gen context dispose");
         LLVMDumpModule(codegen_context.module); // dump module as IR to stdout
         LLVMDisposeBuilder(codegen_context.ir_builder);
         LLVMDisposeModule(codegen_context.module);
