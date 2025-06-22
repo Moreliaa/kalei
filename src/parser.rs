@@ -1,4 +1,4 @@
-use crate::{ast::*, codegen::*, lexer::*, treeprinter::*};
+use crate::{ast::*, codegen::*, lexer::*};
 
 const USE_VERBOSE_LOGS: bool = true;
 
@@ -232,11 +232,6 @@ impl<'a> Parser<'a> {
                 };
 
                 generate_code(&mut codegen_context, function);
-
-                // TODO treeprinter
-                // let mut treeprinter = TreePrinter::new();
-                // function.body.expr.print(&mut treeprinter, 0, 0);
-                // treeprinter.print_tree();
             } else {
                 dispose_context(&mut codegen_context);
                 panic!("Expected token");

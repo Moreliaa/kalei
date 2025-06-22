@@ -33,11 +33,9 @@ pub fn create_context() -> CodeGenContext {
 }
 
 pub fn generate_code(codegen_context: &mut CodeGenContext, function: Box<dyn Function>) {
-    unsafe {
-        println!("===Start generate code===");
-        function.generate_code(codegen_context);
-        println!("===End generate code===");
-    }
+    println!("===Start generate code===");
+    function.generate_code(codegen_context);
+    println!("===End generate code===");
 }
 
 pub fn dispose_context(codegen_context: &mut CodeGenContext) {

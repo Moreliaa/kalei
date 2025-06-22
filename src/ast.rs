@@ -1,13 +1,11 @@
 extern crate llvm_sys as llvm;
 use crate::codegen::*;
-use crate::treeprinter::*;
 use llvm::core::*;
 use llvm::prelude::LLVMValueRef;
 use llvm_sys::analysis::LLVMVerifyFunction;
-use llvm_sys::execution_engine::LLVMGetFunctionAddress;
 
 pub trait Expr {
-    fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32);
+    // fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32);
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef;
 }
 
@@ -20,9 +18,9 @@ impl NumberExprAst {
     }
 }
 impl Expr for NumberExprAst {
-    fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32) {
-        treeprinter.add_print_item(self.val.to_string(), depth, indent_lvl);
-    }
+    // fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32) {
+    //     treeprinter.add_print_item(self.val.to_string(), depth, indent_lvl);
+    // }
 
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         println!("Generate number expr");
@@ -44,11 +42,11 @@ impl BinaryExprAst {
     }
 }
 impl Expr for BinaryExprAst {
-    fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32) {
-        treeprinter.add_print_item(self.op.clone(), depth, indent_lvl);
-        self.lhs.print(treeprinter, indent_lvl - 1, depth + 1);
-        self.rhs.print(treeprinter, indent_lvl + 1, depth + 1);
-    }
+    // fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32) {
+    //     treeprinter.add_print_item(self.op.clone(), depth, indent_lvl);
+    //     self.lhs.print(treeprinter, indent_lvl - 1, depth + 1);
+    //     self.rhs.print(treeprinter, indent_lvl + 1, depth + 1);
+    // }
 
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
@@ -76,9 +74,9 @@ impl VariableExprAst {
     }
 }
 impl Expr for VariableExprAst {
-    fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32) {
-        treeprinter.add_print_item(self.name.clone(), depth, indent_lvl);
-    }
+    // fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32) {
+    //     treeprinter.add_print_item(self.name.clone(), depth, indent_lvl);
+    // }
 
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         println!("Generate variable expr {:?}", self.name);
@@ -100,10 +98,10 @@ impl FunctionCallExprAst {
     }
 }
 impl Expr for FunctionCallExprAst {
-    fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32) {
-        // TODO args
-        treeprinter.add_print_item(self.callee.clone(), depth, indent_lvl);
-    }
+    // fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32) {
+    //     // TODO args
+    //     treeprinter.add_print_item(self.callee.clone(), depth, indent_lvl);
+    // }
 
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
@@ -179,7 +177,7 @@ impl Function for FunctionAst {
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
             let function = self.proto.generate_code(codegen_context); // TODO handle repeated calls
-            let ptr = self.proto.name.as_ptr() as *const i8;
+            //let ptr = self.proto.name.as_ptr() as *const i8;
             let bb =
                 LLVMAppendBasicBlockInContext(codegen_context.context, function, c"entry".as_ptr());
 
