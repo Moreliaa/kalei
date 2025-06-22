@@ -12,6 +12,11 @@ WIP compiler for the [kaleidoscope programming language](https://en.wikipedia.or
 
 def abc(d, e, f) d+e+f;
 
+### Access C++ functions
+
+extern sin(x);
+def sinmock(x) sin(x);
+
 ### Function calls
 
 abc(1,2,3);
