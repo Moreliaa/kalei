@@ -1,6 +1,6 @@
-use crate::treeprinter::*;
 extern crate llvm_sys as llvm;
-use crate::codegen::CodeGenContext;
+use crate::codegen::*;
+use crate::treeprinter::*;
 use llvm::core::*;
 use llvm::prelude::LLVMValueRef;
 use llvm_sys::analysis::LLVMVerifyFunction;
@@ -25,6 +25,7 @@ impl Expr for NumberExprAst {
     }
 
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
+        println!("Generate number expr");
         unsafe {
             let ft = LLVMDoubleTypeInContext(codegen_context.context);
             LLVMConstReal(ft, self.val)
@@ -54,6 +55,7 @@ impl Expr for BinaryExprAst {
             let lhs_value = self.lhs.generate_code(codegen_context);
             let rhs_value = self.rhs.generate_code(codegen_context);
 
+            println!("Generate binary expr {:?}", self.op);
             match self.op.as_str() {
                 "+" => LLVMConstAdd(lhs_value, rhs_value),
                 "-" => LLVMConstSub(lhs_value, rhs_value),
@@ -79,6 +81,7 @@ impl Expr for VariableExprAst {
     }
 
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
+        println!("Generate variable expr {:?}", self.name);
         if codegen_context.named_values.contains_key(&self.name) {
             *codegen_context.named_values.get(&self.name).unwrap()
         } else {
@@ -115,6 +118,7 @@ impl Expr for FunctionCallExprAst {
                 .map(|expr| expr.generate_code(codegen_context))
                 .collect();
 
+            println!("Generate function call {:?}", self.callee);
             LLVMBuildCall2(
                 codegen_context.ir_builder,
                 callee_t,
@@ -143,23 +147,20 @@ impl PrototypeAst {
 impl Function for PrototypeAst {
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
-            println!("===prototype===");
-            println!("llvm double type");
             let dt = LLVMDoubleTypeInContext(codegen_context.context);
             let mut args_t: Vec<llvm::prelude::LLVMTypeRef> =
                 self.args.iter().map(|_| dt).collect();
-            println!("llvm function type");
             let ft = LLVMFunctionType(
                 dt,                  // return type
                 args_t.as_mut_ptr(), // argument types
                 args_t.len() as u32,
-                false as i32, // TODO what is this?
+                false as i32, // whether the function is variadic
             );
             let name = (self.name.clone() + "\0").into_bytes();
             let ptr = name.as_ptr() as *const i8;
 
             // TODO setting arg names
-            println!("create prototype function");
+            println!("Generate function prototype");
             LLVMAddFunction(codegen_context.module, ptr, ft)
         }
     }
@@ -177,10 +178,8 @@ impl FunctionAst {
 impl Function for FunctionAst {
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
-            println!("create prototype");
             let function = self.proto.generate_code(codegen_context); // TODO handle repeated calls
             let ptr = self.proto.name.as_ptr() as *const i8;
-            println!("create block");
             let bb =
                 LLVMAppendBasicBlockInContext(codegen_context.context, function, c"entry".as_ptr());
 
@@ -196,11 +195,8 @@ impl Function for FunctionAst {
                 };
             }
 
-            println!("create function body");
             let return_value = self.body.generate_code(codegen_context);
-            println!("create return value");
             LLVMBuildRet(codegen_context.ir_builder, return_value);
-            println!("verify function");
             LLVMVerifyFunction(
                 function,
                 llvm_sys::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction,
@@ -208,6 +204,7 @@ impl Function for FunctionAst {
             // TODO delete invalid functions
             // TODO fix extern function precedence over local
 
+            println!("Generate function definition");
             function
         }
     }

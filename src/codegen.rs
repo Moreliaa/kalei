@@ -2,19 +2,11 @@ extern crate llvm_sys as llvm;
 use crate::ast::*;
 use std::collections::HashMap;
 
+use llvm::core::*;
 use llvm::prelude::LLVMBuilderRef;
 use llvm::prelude::LLVMContextRef;
+use llvm::prelude::LLVMModuleRef;
 use llvm::prelude::LLVMValueRef;
-use llvm_sys::core::LLVMContextDispose;
-use llvm_sys::core::LLVMDisposeBuilder;
-use llvm_sys::core::LLVMDisposeModule;
-use llvm_sys::core::LLVMDumpModule;
-use llvm_sys::prelude::LLVMModuleRef;
-
-// use llvm::core::*;
-// use llvm::disassembler::*;
-// use llvm::execution_engine::*;
-// use llvm::target::*;
 
 pub struct CodeGenContext {
     pub context: LLVMContextRef,
@@ -26,10 +18,10 @@ pub struct CodeGenContext {
 pub fn create_context() -> CodeGenContext {
     unsafe {
         println!("Create code gen context");
-        let context: LLVMContextRef = llvm::core::LLVMContextCreate();
+        let context: LLVMContextRef = LLVMContextCreate();
         let module_id = c"module".as_ptr();
-        let module = llvm::core::LLVMModuleCreateWithNameInContext(module_id, context);
-        let ir_builder = llvm::core::LLVMCreateBuilderInContext(context);
+        let module = LLVMModuleCreateWithNameInContext(module_id, context);
+        let ir_builder = LLVMCreateBuilderInContext(context);
 
         CodeGenContext {
             context,
@@ -42,14 +34,15 @@ pub fn create_context() -> CodeGenContext {
 
 pub fn generate_code(codegen_context: &mut CodeGenContext, function: Box<dyn Function>) {
     unsafe {
-        println!("Gen code");
+        println!("===Start generate code===");
         function.generate_code(codegen_context);
-        println!("Code gen context dispose");
+        println!("===End generate code===");
     }
 }
 
 pub fn dispose_context(codegen_context: &mut CodeGenContext) {
     unsafe {
+        println!("Code gen context dispose");
         LLVMDumpModule(codegen_context.module); // dump module as IR to stdout
         LLVMDisposeBuilder(codegen_context.ir_builder);
         LLVMDisposeModule(codegen_context.module);
