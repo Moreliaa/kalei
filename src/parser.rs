@@ -229,6 +229,8 @@ impl<'a> Parser<'a> {
                 panic!("Expected token");
             }
         }
+        dump(&mut codegen_context);
+        emit_to_file(&mut codegen_context);
         dispose_context(&mut codegen_context);
     }
 }

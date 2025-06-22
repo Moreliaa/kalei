@@ -54,10 +54,12 @@ impl Expr for BinaryExprAst {
             let rhs_value = self.rhs.generate_code(codegen_context);
 
             log_verbose(format!("Generate binary expr {:?}", self.op));
+            let name = c"op".as_ptr() as *const _;
+
             match self.op.as_str() {
-                "+" => LLVMConstAdd(lhs_value, rhs_value),
-                "-" => LLVMConstSub(lhs_value, rhs_value),
-                "*" => LLVMConstMul(lhs_value, rhs_value),
+                "+" => LLVMBuildFAdd(codegen_context.ir_builder, lhs_value, rhs_value, name),
+                "-" => LLVMBuildFSub(codegen_context.ir_builder, lhs_value, rhs_value, name),
+                "*" => LLVMBuildFMul(codegen_context.ir_builder, lhs_value, rhs_value, name),
                 "/" => todo!(),
                 _ => panic!("Invalid binary operator {}", self.op),
             }
@@ -80,10 +82,13 @@ impl Expr for VariableExprAst {
 
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         log_verbose(format!("Generate variable expr {:?}", self.name));
-        if codegen_context.named_values.contains_key(&self.name) {
-            *codegen_context.named_values.get(&self.name).unwrap()
-        } else {
-            panic!("Unknown variable name {}", self.name);
+        unsafe {
+            if codegen_context.named_values.contains_key(&self.name) {
+                let index = codegen_context.named_values.get(&self.name).unwrap();
+                LLVMGetParam(codegen_context.current_function.unwrap(), *index)
+            } else {
+                panic!("Unknown variable name {}", self.name);
+            }
         }
     }
 }
@@ -177,6 +182,8 @@ impl Function for FunctionAst {
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
         unsafe {
             let function = self.proto.generate_code(codegen_context); // TODO handle repeated calls
+            codegen_context.current_function = Some(function);
+
             //let ptr = self.proto.name.as_ptr() as *const i8;
             let bb =
                 LLVMAppendBasicBlockInContext(codegen_context.context, function, c"entry".as_ptr());
@@ -186,9 +193,8 @@ impl Function for FunctionAst {
 
             codegen_context.named_values.clear();
             for i in 0..self.proto.args.len() {
-                let param = LLVMGetParam(function, i as u32);
                 match self.proto.args.get(i) {
-                    Some(name) => codegen_context.named_values.insert(name.clone(), param),
+                    Some(name) => codegen_context.named_values.insert(name.clone(), i as u32),
                     None => panic!("Invalid function param"),
                 };
             }
@@ -206,6 +212,7 @@ impl Function for FunctionAst {
                 "Generate function definition {:?}",
                 self.proto.name
             ));
+            codegen_context.current_function = None;
             function
         }
     }

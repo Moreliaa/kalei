@@ -7,12 +7,21 @@ use llvm::prelude::LLVMBuilderRef;
 use llvm::prelude::LLVMContextRef;
 use llvm::prelude::LLVMModuleRef;
 use llvm::prelude::LLVMValueRef;
+use llvm_sys::target::*;
+use llvm_sys::target_machine::LLVMCodeGenFileType;
+use llvm_sys::target_machine::LLVMCreateTargetMachine;
+use llvm_sys::target_machine::LLVMGetDefaultTargetTriple;
+use llvm_sys::target_machine::LLVMGetTargetFromTriple;
+use llvm_sys::target_machine::LLVMTarget;
+use llvm_sys::target_machine::LLVMTargetMachineEmitToFile;
+use llvm_sys::target_machine::LLVMTargetRef;
 
 pub struct CodeGenContext {
     pub context: LLVMContextRef,
     pub module: LLVMModuleRef,
     pub ir_builder: LLVMBuilderRef,
-    pub named_values: HashMap<String, LLVMValueRef>,
+    pub named_values: HashMap<String, u32>,
+    pub current_function: Option<LLVMValueRef>,
 }
 
 pub fn create_context() -> CodeGenContext {
@@ -28,6 +37,7 @@ pub fn create_context() -> CodeGenContext {
             module,
             ir_builder,
             named_values: HashMap::new(),
+            current_function: None,
         }
     }
 }
@@ -38,12 +48,75 @@ pub fn generate_code(codegen_context: &mut CodeGenContext, function: Box<dyn Fun
     log_verbose("===End generate code===".to_string());
 }
 
+pub fn dump(codegen_context: &mut CodeGenContext) {
+    println!();
+    println!();
+    unsafe {
+        LLVMDumpModule(codegen_context.module); // dump module as IR to stdout
+    }
+    println!();
+    println!();
+}
+
 pub fn dispose_context(codegen_context: &mut CodeGenContext) {
     unsafe {
         log_verbose("Code gen context dispose".to_string());
-        LLVMDumpModule(codegen_context.module); // dump module as IR to stdout
         LLVMDisposeBuilder(codegen_context.ir_builder);
         LLVMDisposeModule(codegen_context.module);
         LLVMContextDispose(codegen_context.context);
+    }
+}
+
+pub fn emit_to_file(codegen_context: &mut CodeGenContext) {
+    unsafe {
+        LLVM_InitializeAllTargetInfos();
+        LLVM_InitializeAllTargets();
+        LLVM_InitializeAllTargetMCs();
+        LLVM_InitializeAllAsmParsers();
+        LLVM_InitializeAllAsmPrinters();
+
+        // target
+        // https://clang.llvm.org/docs/CrossCompilation.html#target-triple
+        let mut target_triple = LLVMGetDefaultTargetTriple();
+        // TODO deprecated
+        let mut target: LLVMTargetRef = std::mem::uninitialized();
+        let mut error_msg = c"".as_ptr() as *mut i8;
+        if LLVMGetTargetFromTriple(target_triple, &mut target, &mut error_msg) != 0 {
+            println!("Something happened");
+            return;
+        }
+
+        // target machine
+        let cpu = c"generic".as_ptr();
+        let features = c"".as_ptr();
+        let target_machine = LLVMCreateTargetMachine(
+            target,
+            target_triple,
+            cpu,
+            features,
+            llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
+            llvm_sys::target_machine::LLVMRelocMode::LLVMRelocPIC,
+            llvm_sys::target_machine::LLVMCodeModel::LLVMCodeModelDefault,
+        );
+
+        LLVMSetDataLayout(
+            codegen_context.module,
+            LLVMGetDataLayoutStr(codegen_context.module),
+        );
+        // TODO setTargetTriple?
+
+        // emit object code
+        let filename = c"output.o".as_ptr();
+        //let pm = LLVMCreatePassManager();
+        //LLVMRunPassManager(pm, codegen_context.module);
+        let file_type = LLVMCodeGenFileType::LLVMObjectFile;
+        let mut error_msg = c"".as_ptr() as *mut i8;
+        LLVMTargetMachineEmitToFile(
+            target_machine,
+            codegen_context.module,
+            filename,
+            file_type,
+            &mut error_msg,
+        );
     }
 }
