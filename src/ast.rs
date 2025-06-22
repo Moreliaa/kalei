@@ -1,5 +1,5 @@
 extern crate llvm_sys as llvm;
-use crate::codegen::*;
+use crate::{codegen::*, logger::*};
 use llvm::core::*;
 use llvm::prelude::LLVMValueRef;
 use llvm_sys::analysis::LLVMVerifyFunction;
@@ -23,7 +23,7 @@ impl Expr for NumberExprAst {
     // }
 
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
-        println!("Generate number expr");
+        log_verbose(format!("Generate number expr {:?}", self.val));
         unsafe {
             let ft = LLVMDoubleTypeInContext(codegen_context.context);
             LLVMConstReal(ft, self.val)
@@ -53,7 +53,7 @@ impl Expr for BinaryExprAst {
             let lhs_value = self.lhs.generate_code(codegen_context);
             let rhs_value = self.rhs.generate_code(codegen_context);
 
-            println!("Generate binary expr {:?}", self.op);
+            log_verbose(format!("Generate binary expr {:?}", self.op));
             match self.op.as_str() {
                 "+" => LLVMConstAdd(lhs_value, rhs_value),
                 "-" => LLVMConstSub(lhs_value, rhs_value),
@@ -79,7 +79,7 @@ impl Expr for VariableExprAst {
     // }
 
     fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
-        println!("Generate variable expr {:?}", self.name);
+        log_verbose(format!("Generate variable expr {:?}", self.name));
         if codegen_context.named_values.contains_key(&self.name) {
             *codegen_context.named_values.get(&self.name).unwrap()
         } else {
@@ -116,7 +116,7 @@ impl Expr for FunctionCallExprAst {
                 .map(|expr| expr.generate_code(codegen_context))
                 .collect();
 
-            println!("Generate function call {:?}", self.callee);
+            log_verbose(format!("Generate function call {:?}", self.callee));
             LLVMBuildCall2(
                 codegen_context.ir_builder,
                 callee_t,
@@ -158,7 +158,7 @@ impl Function for PrototypeAst {
             let ptr = name.as_ptr() as *const i8;
 
             // TODO setting arg names
-            println!("Generate function prototype");
+            log_verbose(format!("Generate function prototype {:?}", self.name));
             LLVMAddFunction(codegen_context.module, ptr, ft)
         }
     }
@@ -202,7 +202,10 @@ impl Function for FunctionAst {
             // TODO delete invalid functions
             // TODO fix extern function precedence over local
 
-            println!("Generate function definition");
+            log_verbose(format!(
+                "Generate function definition {:?}",
+                self.proto.name
+            ));
             function
         }
     }

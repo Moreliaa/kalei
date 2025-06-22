@@ -1,6 +1,4 @@
-use crate::{ast::*, codegen::*, lexer::*};
-
-const USE_VERBOSE_LOGS: bool = true;
+use crate::{ast::*, codegen::*, lexer::*, logger::*};
 
 pub struct Parser<'a> {
     lexer: &'a mut Lexer<'a>,
@@ -19,7 +17,7 @@ impl<'a> Parser<'a> {
     fn parse_number_expr(&mut self) -> NumberExprAst {
         let result = NumberExprAst::new(self.lexer.num_val);
         self.read_token();
-        self.log_verbose(String::from("Parsed number expression"));
+        log_verbose(String::from("Parsed number expression"));
         result
     }
 
@@ -31,7 +29,7 @@ impl<'a> Parser<'a> {
             panic!("Expected ')'");
         }
         self.read_token(); // eat )
-        self.log_verbose(String::from("Parsed parenthesis expression"));
+        log_verbose(String::from("Parsed parenthesis expression"));
         result
     }
 
@@ -42,7 +40,7 @@ impl<'a> Parser<'a> {
         let identifier = self.lexer.identifier_str.clone();
         self.read_token(); // eat identifier
         if self.lexer.identifier_str != "(" {
-            self.log_verbose(String::from("Parsed identifier"));
+            log_verbose(String::from("Parsed identifier"));
             return Box::new(VariableExprAst::new(identifier));
         }
 
@@ -68,7 +66,7 @@ impl<'a> Parser<'a> {
         }
 
         self.read_token(); // eat )
-        self.log_verbose(String::from("Parsed function call"));
+        log_verbose(String::from("Parsed function call"));
         Box::new(FunctionCallExprAst::new(identifier, args))
     }
 
@@ -98,7 +96,7 @@ impl<'a> Parser<'a> {
         loop {
             let tok_precedence: i8 = self.get_op_precedence();
             if tok_precedence <= expr_precedence {
-                self.log_verbose(String::from("Parsed binary expression"));
+                log_verbose(String::from("Parsed binary expression"));
                 return lhs;
             }
 
@@ -161,14 +159,14 @@ impl<'a> Parser<'a> {
         self.read_token(); // eat def
         let proto = self.parse_prototype();
         let body = self.parse_expr();
-        self.log_verbose(format!("Parsed function definition {}", proto.name));
+        log_verbose(format!("Parsed function definition {}", proto.name));
         FunctionAst::new(proto, body)
     }
 
     // external ::= 'extern' prototype
     fn parse_extern(&mut self) -> PrototypeAst {
         self.read_token(); // eat extern
-        self.log_verbose(String::from("Parsed external function definition"));
+        log_verbose(String::from("Parsed external function definition"));
         self.parse_prototype()
     }
 
@@ -176,19 +174,13 @@ impl<'a> Parser<'a> {
     fn parse_top_level_expr(&mut self) -> FunctionAst {
         let expr = self.parse_expr();
         let proto = PrototypeAst::new(String::new(), vec![]);
-        self.log_verbose(String::from("Parsed top-level expression"));
+        log_verbose(String::from("Parsed top-level expression"));
         FunctionAst::new(proto, expr)
-    }
-
-    fn log_verbose(&self, msg: String) {
-        if USE_VERBOSE_LOGS {
-            println!("{}", msg);
-        }
     }
 
     fn read_token(&mut self) {
         self.cur_token = Some(self.lexer.get_token());
-        self.log_verbose(format!(
+        log_verbose(format!(
             "Read a token {:?} {:?}",
             if !self.lexer.identifier_str.is_empty() {
                 self.lexer.identifier_str.to_string()

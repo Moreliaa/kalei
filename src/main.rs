@@ -1,6 +1,7 @@
 mod ast;
 mod codegen;
 mod lexer;
+mod logger;
 mod parser;
 use crate::lexer::Lexer;
 use crate::parser::Parser;

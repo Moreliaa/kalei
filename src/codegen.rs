@@ -1,5 +1,5 @@
 extern crate llvm_sys as llvm;
-use crate::ast::*;
+use crate::{ast::*, logger::*};
 use std::collections::HashMap;
 
 use llvm::core::*;
@@ -17,7 +17,7 @@ pub struct CodeGenContext {
 
 pub fn create_context() -> CodeGenContext {
     unsafe {
-        println!("Create code gen context");
+        log_verbose("Create code gen context".to_string());
         let context: LLVMContextRef = LLVMContextCreate();
         let module_id = c"module".as_ptr();
         let module = LLVMModuleCreateWithNameInContext(module_id, context);
@@ -33,14 +33,14 @@ pub fn create_context() -> CodeGenContext {
 }
 
 pub fn generate_code(codegen_context: &mut CodeGenContext, function: Box<dyn Function>) {
-    println!("===Start generate code===");
+    log_verbose("===Start generate code===".to_string());
     function.generate_code(codegen_context);
-    println!("===End generate code===");
+    log_verbose("===End generate code===".to_string());
 }
 
 pub fn dispose_context(codegen_context: &mut CodeGenContext) {
     unsafe {
-        println!("Code gen context dispose");
+        log_verbose("Code gen context dispose".to_string());
         LLVMDumpModule(codegen_context.module); // dump module as IR to stdout
         LLVMDisposeBuilder(codegen_context.ir_builder);
         LLVMDisposeModule(codegen_context.module);
