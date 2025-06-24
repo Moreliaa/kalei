@@ -72,23 +72,23 @@ pub fn emit_to_file(codegen_context: &mut CodeGenContext) {
         LLVM_InitializeAllTargetInfos();
         LLVM_InitializeAllTargets();
         LLVM_InitializeAllTargetMCs();
-        LLVM_InitializeAllAsmParsers();
         LLVM_InitializeAllAsmPrinters();
 
-        // target
         // https://clang.llvm.org/docs/CrossCompilation.html#target-triple
-        let mut target_triple = LLVMGetDefaultTargetTriple();
-        // TODO deprecated
-        let mut target: LLVMTargetRef = std::mem::uninitialized();
+        let target_triple = LLVMGetDefaultTargetTriple();
+        let mut target: std::mem::MaybeUninit<LLVMTargetRef> = std::mem::MaybeUninit::uninit();
         let mut error_msg = c"".as_ptr() as *mut i8;
-        if LLVMGetTargetFromTriple(target_triple, &mut target, &mut error_msg) != 0 {
-            println!("Something happened");
+        if LLVMGetTargetFromTriple(target_triple, target.as_mut_ptr(), &mut error_msg) != 0 {
+            println!("Failed to get target");
             return;
         }
+
+        let target: LLVMTargetRef = target.assume_init();
 
         // target machine
         let cpu = c"generic".as_ptr();
         let features = c"".as_ptr();
+        println!("Target Machine");
         let target_machine = LLVMCreateTargetMachine(
             target,
             target_triple,
@@ -99,18 +99,18 @@ pub fn emit_to_file(codegen_context: &mut CodeGenContext) {
             llvm_sys::target_machine::LLVMCodeModel::LLVMCodeModelDefault,
         );
 
+        println!("Set data layout");
         LLVMSetDataLayout(
             codegen_context.module,
             LLVMGetDataLayoutStr(codegen_context.module),
         );
-        // TODO setTargetTriple?
 
-        // emit object code
         let filename = c"output.o".as_ptr();
         //let pm = LLVMCreatePassManager();
         //LLVMRunPassManager(pm, codegen_context.module);
         let file_type = LLVMCodeGenFileType::LLVMObjectFile;
         let mut error_msg = c"".as_ptr() as *mut i8;
+        println!("Emit file");
         LLVMTargetMachineEmitToFile(
             target_machine,
             codegen_context.module,
