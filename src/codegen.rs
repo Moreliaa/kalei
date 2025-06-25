@@ -8,6 +8,7 @@ use llvm::prelude::LLVMContextRef;
 use llvm::prelude::LLVMModuleRef;
 use llvm::prelude::LLVMValueRef;
 use llvm_sys::target::*;
+use llvm_sys::target_machine::LLVMAddAnalysisPasses;
 use llvm_sys::target_machine::LLVMCodeGenFileType;
 use llvm_sys::target_machine::LLVMCreateTargetMachine;
 use llvm_sys::target_machine::LLVMGetDefaultTargetTriple;
@@ -64,6 +65,27 @@ pub fn dispose_context(codegen_context: &mut CodeGenContext) {
         LLVMDisposeBuilder(codegen_context.ir_builder);
         LLVMDisposeModule(codegen_context.module);
         LLVMContextDispose(codegen_context.context);
+    }
+}
+
+pub fn init_pass_module_and_managers() {
+    unsafe {
+        let context = LLVMContextCreate();
+        let module = LLVMModuleCreateWithNameInContext(c"JIT".as_ptr(), context);
+        LLVMSetDataLayout(module, LLVMGetDataLayoutStr(module));
+        let ir_builder = LLVMCreateBuilderInContext(context);
+
+        let fpm = LLVMCreateFunctionPassManagerForModule(module);
+        //let lam = loop analysis manager
+        // let fam = FunctionAnalysisManager
+        // CGSCCAnalysis
+        // let mam = ModuleAnalysis
+        // PassInstru
+        // StandardInstrumenta
+
+        // registerCallbacks
+        todo!()
+        // LLVMAddAnalysisPasses(T, fpm);
     }
 }
 

@@ -167,9 +167,9 @@ impl Function for PrototypeAst {
 
             // set function parameter names
             for i in 0..args_t.len() {
-                let param1 = LLVMGetParam(result, i as u32);
-                let paramname = (self.args.get(i).unwrap().clone()).into_bytes();
-                LLVMSetValueName2(param1, paramname.as_ptr() as *const i8, paramname.len());
+                let param = LLVMGetParam(result, i as u32);
+                let param_name = (self.args.get(i).unwrap().clone()).into_bytes();
+                LLVMSetValueName2(param, param_name.as_ptr() as *const i8, param_name.len());
             }
 
             result
