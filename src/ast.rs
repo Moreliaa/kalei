@@ -6,7 +6,7 @@ use llvm_sys::analysis::LLVMVerifyFunction;
 
 pub trait Expr {
     // fn print(&self, treeprinter: &mut TreePrinter, indent_lvl: i32, depth: i32);
-    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef;
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> Result<LLVMValueRef, String>;
 }
 
 pub struct NumberExprAst {
@@ -22,11 +22,11 @@ impl Expr for NumberExprAst {
     //     treeprinter.add_print_item(self.val.to_string(), depth, indent_lvl);
     // }
 
-    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> Result<LLVMValueRef, String> {
         log_verbose(format!("Generate number expr {:?}", self.val));
         unsafe {
             let ft = LLVMDoubleTypeInContext(codegen_context.context);
-            LLVMConstReal(ft, self.val)
+            Ok(LLVMConstReal(ft, self.val))
         }
     }
 }
@@ -48,20 +48,35 @@ impl Expr for BinaryExprAst {
     //     self.rhs.print(treeprinter, indent_lvl + 1, depth + 1);
     // }
 
-    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> Result<LLVMValueRef, String> {
         unsafe {
-            let lhs_value = self.lhs.generate_code(codegen_context);
-            let rhs_value = self.rhs.generate_code(codegen_context);
+            let lhs_value = self.lhs.generate_code(codegen_context)?;
+            let rhs_value = self.rhs.generate_code(codegen_context)?;
 
             log_verbose(format!("Generate binary expr {:?}", self.op));
             let name = c"op".as_ptr() as *const _;
 
             match self.op.as_str() {
-                "+" => LLVMBuildFAdd(codegen_context.ir_builder, lhs_value, rhs_value, name),
-                "-" => LLVMBuildFSub(codegen_context.ir_builder, lhs_value, rhs_value, name),
-                "*" => LLVMBuildFMul(codegen_context.ir_builder, lhs_value, rhs_value, name),
-                "/" => todo!(),
-                _ => panic!("Invalid binary operator {}", self.op),
+                "+" => Ok(LLVMBuildFAdd(
+                    codegen_context.ir_builder,
+                    lhs_value,
+                    rhs_value,
+                    name,
+                )),
+                "-" => Ok(LLVMBuildFSub(
+                    codegen_context.ir_builder,
+                    lhs_value,
+                    rhs_value,
+                    name,
+                )),
+                "*" => Ok(LLVMBuildFMul(
+                    codegen_context.ir_builder,
+                    lhs_value,
+                    rhs_value,
+                    name,
+                )),
+                //"/" => Err("Division not implemented")?,
+                _ => Err(format!("Invalid binary operator {}", self.op)),
             }
         }
     }
@@ -80,14 +95,17 @@ impl Expr for VariableExprAst {
     //     treeprinter.add_print_item(self.name.clone(), depth, indent_lvl);
     // }
 
-    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> Result<LLVMValueRef, String> {
         log_verbose(format!("Generate variable expr {:?}", self.name));
         unsafe {
             if codegen_context.named_values.contains_key(&self.name) {
                 let index = codegen_context.named_values.get(&self.name).unwrap();
-                LLVMGetParam(codegen_context.current_function.unwrap(), *index)
+                Ok(LLVMGetParam(
+                    codegen_context.current_function.unwrap(),
+                    *index,
+                ))
             } else {
-                panic!("Unknown variable name {}", self.name);
+                Err(format!("Unknown variable name {}", self.name))
             }
         }
     }
@@ -108,34 +126,44 @@ impl Expr for FunctionCallExprAst {
     //     treeprinter.add_print_item(self.callee.clone(), depth, indent_lvl);
     // }
 
-    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> Result<LLVMValueRef, String> {
         unsafe {
             // convert rust *const u8 pointer to C-compatible *const i8 pointer
             let name = (self.callee.clone() + "\0").into_bytes();
             let ptr = name.as_ptr() as *const i8;
             let callee_nf = LLVMGetNamedFunction(codegen_context.module, ptr);
             let callee_t = LLVMGlobalGetValueType(callee_nf);
-            let mut args_v: Vec<LLVMValueRef> = self
+            let args_v: Vec<Result<LLVMValueRef, String>> = self
                 .args
                 .iter()
                 .map(|expr| expr.generate_code(codegen_context))
                 .collect();
+            for arg in args_v.iter() {
+                match arg {
+                    Ok(_) => {}
+                    Err(e) => {
+                        return Err(e.clone());
+                    }
+                };
+            }
+            let mut args_v: Vec<LLVMValueRef> =
+                args_v.into_iter().map(|val| val.unwrap()).collect();
 
             log_verbose(format!("Generate function call {:?}", self.callee));
-            LLVMBuildCall2(
+            Ok(LLVMBuildCall2(
                 codegen_context.ir_builder,
                 callee_t,
                 callee_nf,
                 args_v.as_mut_ptr(),
                 args_v.len() as u32,
                 ptr,
-            )
+            ))
         }
     }
 }
 
 pub trait Function {
-    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef;
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> Result<LLVMValueRef, String>;
 }
 
 pub struct PrototypeAst {
@@ -148,7 +176,7 @@ impl PrototypeAst {
     }
 }
 impl Function for PrototypeAst {
-    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> Result<LLVMValueRef, String> {
         unsafe {
             let dt = LLVMDoubleTypeInContext(codegen_context.context);
             let mut args_t: Vec<llvm::prelude::LLVMTypeRef> =
@@ -172,7 +200,7 @@ impl Function for PrototypeAst {
                 LLVMSetValueName2(param, param_name.as_ptr() as *const i8, param_name.len());
             }
 
-            result
+            Ok(result)
         }
     }
 }
@@ -187,9 +215,16 @@ impl FunctionAst {
     }
 }
 impl Function for FunctionAst {
-    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> LLVMValueRef {
+    fn generate_code(&self, codegen_context: &mut CodeGenContext) -> Result<LLVMValueRef, String> {
         unsafe {
-            let function = self.proto.generate_code(codegen_context); // TODO handle repeated calls
+            let function = self.proto.generate_code(codegen_context);
+            match function {
+                Ok(_) => {}
+                Err(e) => {
+                    return Err(e.clone());
+                }
+            };
+            let function = function.unwrap();
             codegen_context.current_function = Some(function);
 
             //let ptr = self.proto.name.as_ptr() as *const i8;
@@ -203,17 +238,30 @@ impl Function for FunctionAst {
             for i in 0..self.proto.args.len() {
                 match self.proto.args.get(i) {
                     Some(name) => codegen_context.named_values.insert(name.clone(), i as u32),
-                    None => panic!("Invalid function param"),
+                    None => {
+                        codegen_context.current_function = None;
+                        LLVMDeleteFunction(function);
+                        return Err(String::from("Invalid function param"));
+                    }
                 };
             }
 
             let return_value = self.body.generate_code(codegen_context);
+            match return_value {
+                Ok(_) => {}
+                Err(e) => {
+                    codegen_context.current_function = None;
+                    LLVMDeleteFunction(function);
+                    return Err(e.clone());
+                }
+            };
+            let return_value = return_value.unwrap();
             LLVMBuildRet(codegen_context.ir_builder, return_value);
             LLVMVerifyFunction(
                 function,
                 llvm_sys::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction,
             );
-            // TODO delete invalid functions
+
             // TODO fix extern function precedence over local
 
             log_verbose(format!(
@@ -221,7 +269,7 @@ impl Function for FunctionAst {
                 self.proto.name
             ));
             codegen_context.current_function = None;
-            function
+            Ok(function)
         }
     }
 }

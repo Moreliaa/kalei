@@ -45,7 +45,10 @@ pub fn create_context() -> CodeGenContext {
 
 pub fn generate_code(codegen_context: &mut CodeGenContext, function: Box<dyn Function>) {
     log_verbose("===Start generate code===".to_string());
-    function.generate_code(codegen_context);
+    match function.generate_code(codegen_context) {
+        Ok(_) => {}
+        Err(e) => println!("{}", e),
+    };
     log_verbose("===End generate code===".to_string());
 }
 

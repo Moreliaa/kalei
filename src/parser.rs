@@ -217,6 +217,8 @@ impl<'a> Parser<'a> {
             stdout.flush().unwrap();
             let mut buffer = String::new();
             stdin.read_line(&mut buffer).unwrap();
+
+            println!();
             self.lexer.set_buffer(buffer);
             self.read_token();
             if let Some(tok) = &self.cur_token {
