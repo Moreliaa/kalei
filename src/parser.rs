@@ -1,12 +1,15 @@
 use crate::{ast::*, codegen::*, lexer::*, logger::*};
+use std::io::prelude::*;
+
+use std::io::{stdin, stdout};
 
 pub struct Parser<'a> {
-    lexer: &'a mut Lexer<'a>,
+    lexer: &'a mut Lexer,
     cur_token: Option<Token>,
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(lexer: &'a mut Lexer<'a>) -> Parser<'a> {
+    pub fn new(lexer: &'a mut Lexer) -> Parser<'a> {
         Parser {
             lexer,
             cur_token: None,
@@ -205,9 +208,17 @@ impl<'a> Parser<'a> {
     }
 
     pub fn main_loop(&mut self) {
-        self.read_token();
+        // Note: run with echo <input string> | cargo run
+        let stdin = stdin();
+        let mut stdout = stdout();
         let mut codegen_context = create_context();
         loop {
+            print!("ready>");
+            stdout.flush().unwrap();
+            let mut buffer = String::new();
+            stdin.read_line(&mut buffer).unwrap();
+            self.lexer.set_buffer(buffer);
+            self.read_token();
             if let Some(tok) = &self.cur_token {
                 let function: Box<dyn Function> = match tok {
                     Token::Eof => break,
