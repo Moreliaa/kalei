@@ -217,29 +217,38 @@ impl<'a> Parser<'a> {
             stdout.flush().unwrap();
             let mut buffer = String::new();
             stdin.read_line(&mut buffer).unwrap();
-
             println!();
             self.lexer.set_buffer(buffer);
             self.read_token();
-            if let Some(tok) = &self.cur_token {
-                let function: Box<dyn Function> = match tok {
-                    Token::Eof => break,
-                    Token::Def => Box::new(self.parse_def()),
-                    Token::Extern => Box::new(self.parse_extern()),
-                    Token::Character => match self.lexer.identifier_str.as_str() {
-                        ";" => {
-                            self.read_token(); // eat ;
-                            continue;
-                        }
-                        _ => Box::new(self.parse_top_level_expr()),
-                    },
-                    _ => Box::new(self.parse_top_level_expr()),
-                };
 
-                generate_code(&mut codegen_context, function);
-            } else {
-                dispose_context(&mut codegen_context);
-                panic!("Expected token");
+            // user typed an empty line
+            if let Some(tok) = &self.cur_token {
+                if *tok == Token::Eof {
+                    break;
+                }
+            }
+
+            loop {
+                if let Some(tok) = &self.cur_token {
+                    let function: Box<dyn Function> = match tok {
+                        Token::Eof => break,
+                        Token::Def => Box::new(self.parse_def()),
+                        Token::Extern => Box::new(self.parse_extern()),
+                        Token::Character => match self.lexer.identifier_str.as_str() {
+                            ";" => {
+                                self.read_token(); // eat ;
+                                continue;
+                            }
+                            _ => Box::new(self.parse_top_level_expr()),
+                        },
+                        _ => Box::new(self.parse_top_level_expr()),
+                    };
+
+                    generate_code(&mut codegen_context, function);
+                } else {
+                    dispose_context(&mut codegen_context);
+                    panic!("Expected token");
+                }
             }
         }
         dump(&mut codegen_context);

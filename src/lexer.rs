@@ -34,6 +34,7 @@ impl Lexer {
     pub fn set_buffer(&mut self, buffer: String) {
         self.buffer = buffer.chars().collect();
         self.char_idx = 0;
+        self.last_char = Some(' ');
     }
 
     fn get_next_char(&mut self) -> Option<char> {

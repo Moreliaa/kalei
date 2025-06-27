@@ -113,7 +113,7 @@ pub fn emit_to_file(codegen_context: &mut CodeGenContext) {
         // target machine
         let cpu = c"generic".as_ptr();
         let features = c"".as_ptr();
-        println!("Target Machine");
+        println!("Create target machine");
         let target_machine = LLVMCreateTargetMachine(
             target,
             target_triple,
